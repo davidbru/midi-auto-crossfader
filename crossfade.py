@@ -1,110 +1,110 @@
 from pynput import keyboard
 import mido
+import threading
 import time
 
-# Specify the Control Change number and values for the crossfader
-MIDI_CC_NUMBER         = 60   # CC number for Composition Crossfader Phase
-MIDI_CURRENT_VALUE     = 64   # Value (0-127) where 64 is the middle position (0 in range -1 to 1)
-MIDI_CHANNEL           = 1    # MIDI channel (1-based)
+# MIDI CC details
+MIDI_CC_NUMBER = 60   # CC number for Composition Crossfader Phase
+MIDI_CHANNEL = 1    # MIDI channel (1-based)
 
-CTRL_PRESSED           = False
-CROSSFADE_RUNNING_DOWN = False
-CROSSFADE_COUNT_DIRECTION = False
+midi_current_value = 64   # Current value (0-127), where 64 is the middle
+ctrl_pressed = False
+crossfade_thread = None
+crossfade_running = False
+crossfade_direction = None
+crossfade_interrupt = False
 
-
-# Open the MIDI output port once on startup
+# Open MIDI output once
 OUTPUT_PORT = mido.open_output('IAC-Treiber Bus 1')
 
-def on_press(KEY):
-    global CTRL_PRESSED
+# Function to send MIDI Control Change message
+def send_midi_cc(value, direction):
+    print(f'Sending MIDI CC {value}, direction: {direction}')
+    msg_cc = mido.Message('control_change', control=MIDI_CC_NUMBER, value=value, channel=MIDI_CHANNEL-1)
+    OUTPUT_PORT.send(msg_cc)
+    print(f'Sent Control Change: {msg_cc}')
+
+# Function to handle crossfade logic in a separate thread
+def crossfade_loop():
+    global midi_current_value, crossfade_running, crossfade_direction, crossfade_interrupt
+
+    while crossfade_running:
+        if crossfade_interrupt:
+            # Exit if interrupted
+            print("Crossfade interrupted!")
+            return
+
+        if crossfade_direction == 'down' and midi_current_value > 0:
+            midi_current_value -= 1
+            send_midi_cc(midi_current_value, 'down')
+
+        elif crossfade_direction == 'up' and midi_current_value < 127:
+            midi_current_value += 1
+            send_midi_cc(midi_current_value, 'up')
+
+        else:
+            crossfade_running = False
+            return
+
+        time.sleep(0.05)  # Delay for smooth crossfading
+
+# Start crossfade in a separate thread, with interruption logic
+def start_crossfade(direction):
+    global crossfade_running, crossfade_direction, crossfade_thread, crossfade_interrupt
+
+    if crossfade_running and crossfade_direction != direction:
+        # If already running, interrupt and switch direction
+        print(f"Interrupting crossfade to switch direction to {direction}")
+        crossfade_interrupt = True
+        crossfade_thread.join()  # Wait for the previous thread to stop
+
+    # Start new crossfade
+    crossfade_direction = direction
+    crossfade_running = True
+    crossfade_interrupt = False
+    crossfade_thread = threading.Thread(target=crossfade_loop)
+    crossfade_thread.start()
+
+# Stop the crossfade thread
+def stop_crossfade():
+    global crossfade_running, crossfade_interrupt
+    crossfade_interrupt = True
+    crossfade_running = False
+
+# Function to handle key press events
+def on_press(key):
+    global ctrl_pressed
 
     try:
-        if KEY == keyboard.Key.ctrl_l or KEY == keyboard.Key.ctrl_r:
-            CTRL_PRESSED = True
+        if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+            ctrl_pressed = True
 
-        if CTRL_PRESSED:
-            if KEY.char == '<':
-                print("Ctrl + < detected!")
-                decrease_value(True)
+        if ctrl_pressed:
+            if key.char == '<':
+                print("Ctrl + < detected: Crossfade down")
+                start_crossfade('down')
 
-            if KEY.char == 'z':
-                print("Ctrl + Y detected!")
-                increase_value(True)
+            if key.char == 'z':
+                print("Ctrl + Z detected: Crossfade up")
+                start_crossfade('up')
 
     except AttributeError:
-        pass  # Handle special keys like arrows
+        pass  # Special keys like arrows
 
+# Function to handle key release events
+def on_release(key):
+    global ctrl_pressed
 
+    if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+        ctrl_pressed = False
 
-def on_release(KEY):
-    global CTRL_PRESSED
-
-    # If Ctrl is released
-    if KEY == keyboard.Key.ctrl_l or KEY == keyboard.Key.ctrl_r:
-        CTRL_PRESSED = False
-
-    # Stop listener if Esc is pressed
-    if KEY == keyboard.Key.esc:
+    if key == keyboard.Key.esc:
+        stop_crossfade()
         OUTPUT_PORT.close()
         return False
 
-
-
-def send_midi_cc(VALUE, CONTEXT):
-    print(f'      send_midi_cc({VALUE}, {CONTEXT})')
-    msg_cc = mido.Message('control_change', control=MIDI_CC_NUMBER, value=VALUE, channel=MIDI_CHANNEL-1)
-    OUTPUT_PORT.send(msg_cc)
-    print(f'      Sent Control Change: {msg_cc}, {CONTEXT}')
-
-
-
-def decrease_value(IS_INITIAL_CALL = False):
-    global CROSSFADE_COUNT_DIRECTION, MIDI_CURRENT_VALUE
-    print(f'  decrease_value({IS_INITIAL_CALL}): {CROSSFADE_COUNT_DIRECTION}, {MIDI_CURRENT_VALUE}')
-
-    if IS_INITIAL_CALL == True:
-        CROSSFADE_COUNT_DIRECTION = 'down'
-
-    if CROSSFADE_COUNT_DIRECTION == 'down':
-        print(f'    decrease_value - before send_midi_cc({MIDI_CURRENT_VALUE}, down)')
-        send_midi_cc(MIDI_CURRENT_VALUE, 'down')
-        time.sleep(0.1)
-
-        if MIDI_CURRENT_VALUE > 0:
-            MIDI_CURRENT_VALUE = MIDI_CURRENT_VALUE - 1
-            decrease_value()
-
-        elif MIDI_CURRENT_VALUE == 0:
-            CROSSFADE_COUNT_DIRECTION = False
-            print("Decreasing completed, MIDI value is now 0.")
-            return
-
-
-
-def increase_value(IS_INITIAL_CALL = False):
-    global CROSSFADE_COUNT_DIRECTION, MIDI_CURRENT_VALUE
-    print(f'  increase_value({IS_INITIAL_CALL}): {CROSSFADE_COUNT_DIRECTION}, {MIDI_CURRENT_VALUE}')
-
-    if IS_INITIAL_CALL == True:
-        CROSSFADE_COUNT_DIRECTION = 'up'
-
-    if CROSSFADE_COUNT_DIRECTION == 'up':
-        print(f'    increase_value - before send_midi_cc({MIDI_CURRENT_VALUE}, up)')
-        send_midi_cc(MIDI_CURRENT_VALUE, 'up')
-        time.sleep(0.1)
-
-        if MIDI_CURRENT_VALUE < 126:
-            MIDI_CURRENT_VALUE = MIDI_CURRENT_VALUE + 1
-            increase_value()
-
-        elif MIDI_CURRENT_VALUE == 126:
-            CROSSFADE_COUNT_DIRECTION = False
-            print("Increasing completed, MIDI value is now 126.")
-            return
-
-
+# Start the keyboard listener
 with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
     listener.join()
-
 
 OUTPUT_PORT.close()
