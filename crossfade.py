@@ -14,6 +14,10 @@ crossfade_running = False
 crossfade_direction = None
 crossfade_interrupt = False
 
+# Durations for total crossfade time (from 0 to 127)
+DURATIONS = [1, 2, 10, 30, 60, 300, 600]  # In seconds: 1sec, 2sec, 10sec, 30sec, 1min, 5min, 10min
+duration_index = 3  # Start with the 3sec duration by default
+
 # Open MIDI output once
 OUTPUT_PORT = mido.open_output('IAC-Treiber Bus 1')
 
@@ -28,9 +32,11 @@ def send_midi_cc(value, direction):
 def crossfade_loop():
     global midi_current_value, crossfade_running, crossfade_direction, crossfade_interrupt
 
+    total_duration = DURATIONS[duration_index]  # Get the total duration
+    delay = total_duration / 127  # Calculate the delay between each step
+
     while crossfade_running:
         if crossfade_interrupt:
-            # Exit if interrupted
             print("Crossfade interrupted!")
             return
 
@@ -46,14 +52,13 @@ def crossfade_loop():
             crossfade_running = False
             return
 
-        time.sleep(0.05)  # Delay for smooth crossfading
+        time.sleep(delay)  # Dynamic delay based on duration
 
 # Start crossfade in a separate thread, with interruption logic
 def start_crossfade(direction):
     global crossfade_running, crossfade_direction, crossfade_thread, crossfade_interrupt
 
     if crossfade_running and crossfade_direction != direction:
-        # If already running, interrupt and switch direction
         print(f"Interrupting crossfade to switch direction to {direction}")
         crossfade_interrupt = True
         crossfade_thread.join()  # Wait for the previous thread to stop
@@ -71,6 +76,17 @@ def stop_crossfade():
     crossfade_interrupt = True
     crossfade_running = False
 
+# Adjust duration
+def adjust_duration(increase=True):
+    global duration_index
+
+    if increase and duration_index < len(DURATIONS) - 1:
+        duration_index += 1
+    elif not increase and duration_index > 0:
+        duration_index -= 1
+
+    print(f"Duration set to {DURATIONS[duration_index]} seconds")
+
 # Function to handle key press events
 def on_press(key):
     global ctrl_pressed
@@ -80,11 +96,19 @@ def on_press(key):
             ctrl_pressed = True
 
         if ctrl_pressed:
-            if key.char == '<':
+            if key == keyboard.Key.right:
+                print("Ctrl + Arrow Right detected: Increase duration")
+                adjust_duration(increase=True)
+
+            elif key == keyboard.Key.left:
+                print("Ctrl + Arrow Left detected: Decrease duration")
+                adjust_duration(increase=False)
+
+            elif key.char == '<':
                 print("Ctrl + < detected: Crossfade down")
                 start_crossfade('down')
 
-            if key.char == 'z':
+            elif key.char == 'z':
                 print("Ctrl + Z detected: Crossfade up")
                 start_crossfade('up')
 
