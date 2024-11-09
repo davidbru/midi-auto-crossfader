@@ -6,6 +6,9 @@ $ pip install pynput
 
 
 # Usage
+```
+$ python /Users/david/Workspaces/visuals/midi-auto-crossfader/crossfade.py
+```
 - Default Duration
   - `10 Seconds`
 - Fade to Left
