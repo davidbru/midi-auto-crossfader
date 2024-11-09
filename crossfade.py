@@ -35,7 +35,7 @@ def send_midi_cc(value, direction):
     print(f'Sending MIDI CC {value}, direction: {direction}')
     msg_cc = mido.Message('control_change', control=MIDI_CC_NUMBER, value=value, channel=MIDI_CHANNEL-1)
     OUTPUT_PORT.send(msg_cc)
-    print(f'Sent Control Change: {msg_cc}')
+    # print(f'Sent Control Change: {msg_cc}')
 
 # Function to handle crossfade logic in a separate thread
 def crossfade_loop():
@@ -49,13 +49,13 @@ def crossfade_loop():
             print("Crossfade interrupted!")
             return
 
-        if crossfade_direction == 'down' and midi_current_value > 0:
+        if crossfade_direction == 'left' and midi_current_value > 0:
             midi_current_value -= 1
-            send_midi_cc(midi_current_value, 'down')
+            send_midi_cc(midi_current_value, 'left')
 
-        elif crossfade_direction == 'up' and midi_current_value < 127:
+        elif crossfade_direction == 'right' and midi_current_value < 127:
             midi_current_value += 1
-            send_midi_cc(midi_current_value, 'up')
+            send_midi_cc(midi_current_value, 'right')
 
         else:
             crossfade_running = False
@@ -120,12 +120,12 @@ def on_press(key):
                 adjust_duration(increase=False)
 
             elif key.char == '<':
-                print("[Keyboard] Ctrl + < pressed: Crossfade down")
-                start_crossfade('down')
+                print("[Keyboard] Ctrl + < pressed: Crossfade left")
+                start_crossfade('left')
 
             elif key.char == 'z':
-                print("[Keyboard] Ctrl + Z pressed: Crossfade up")
-                start_crossfade('up')
+                print("[Keyboard] Ctrl + Y pressed: Crossfade right")
+                start_crossfade('right')
 
     except AttributeError:
         pass  # Special keys like arrows
@@ -149,11 +149,11 @@ def midi_listener():
     if USB_XSESSION_PORT:
         for msg in USB_XSESSION_PORT:
             if msg.type == 'control_change' and msg.control == MIDICONTROLLER_LEFT_CC_NUMBER:
-                print("[USB Controller] ⏴ pressed: Crossfade down")
-                start_crossfade('down')
+                print("[USB Controller] ⏴ pressed: Crossfade left")
+                start_crossfade('left')
             if msg.type == 'control_change' and msg.control == MIDICONTROLLER_RIGHT_CC_NUMBER:
-                print("[USB Controller] ⏵ pressed: Crossfade up")
-                start_crossfade('up')
+                print("[USB Controller] ⏵ pressed: Crossfade right")
+                start_crossfade('right')
 
 # Start the MIDI listener thread
 if USB_XSESSION_PORT:
