@@ -4,10 +4,13 @@ import threading
 import time
 
 # MIDI CC details
-MIDI_CC_NUMBER = 60   # CC number for Composition Crossfader Phase
-MIDI_CHANNEL = 1    # MIDI channel (1-based)
+MIDI_CC_NUMBER = 60                 # CC number for Composition Crossfader Phase
+MIDI_CHANNEL = 1                    # MIDI channel (1-based)
+MIDICONTROLLER_LEFT_CC_NUMBER = 87  # CC number for the "Fade to Left"-button on USB X-Session Anschluss 1
+MIDICONTROLLER_RIGHT_CC_NUMBER = 15 # CC number for the "Fade to Right"-button on USB X-Session Anschluss 1
 
-midi_current_value = 64   # Current value (0-127), where 64 is the middle
+# DEFAULT VALUES
+midi_current_value = 64 # Current value (0-127), where 64 is the middle
 ctrl_pressed = False
 crossfade_thread = None
 crossfade_running = False
@@ -20,6 +23,12 @@ duration_index = 2  # Start with the 10sec duration by default
 
 # Open MIDI output once
 OUTPUT_PORT = mido.open_output('IAC-Treiber Bus 1')
+USB_XSESSION_PORT = None
+
+try:
+    USB_XSESSION_PORT = mido.open_input('USB X-Session Anschluss 1')
+except IOError:
+    print("'USB X-Session Anschluss 1' not available")
 
 # Function to send MIDI Control Change message
 def send_midi_cc(value, direction):
@@ -125,10 +134,32 @@ def on_release(key):
     if key == keyboard.Key.esc:
         stop_crossfade()
         OUTPUT_PORT.close()
+        if USB_XSESSION_PORT:
+            USB_XSESSION_PORT.close()
         return False
+
+# Function to listen for MIDI messages on USB X-Session
+def midi_listener():
+    if USB_XSESSION_PORT:
+        for msg in USB_XSESSION_PORT:
+            if msg.type == 'control_change' and msg.control == MIDICONTROLLER_LEFT_CC_NUMBER:
+                print("Button on USB X-Session pressed: Starting crossfade Left")
+                start_crossfade('down')
+            if msg.type == 'control_change' and msg.control == MIDICONTROLLER_RIGHT_CC_NUMBER:
+                print("Button on USB X-Session pressed: Starting crossfade Right")
+                start_crossfade('up')
+
+# Start the MIDI listener thread
+if USB_XSESSION_PORT:
+    print("USB_XSESSION_PORT available")
+    threading.Thread(target=midi_listener, daemon=True).start()
+else:
+    print("USB_XSESSION_PORT NOT available")
 
 # Start the keyboard listener
 with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
     listener.join()
 
 OUTPUT_PORT.close()
+if USB_XSESSION_PORT:
+    USB_XSESSION_PORT.close()
