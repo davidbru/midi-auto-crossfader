@@ -67,6 +67,12 @@ def crossfade_loop():
 def start_crossfade(direction):
     global crossfade_running, crossfade_direction, crossfade_thread, crossfade_interrupt
 
+    # If already running in the same direction, don't start another thread
+    if crossfade_running and crossfade_direction == direction:
+        print(f"Already crossfading {direction}, skipping redundant start.")
+        return
+
+    # If running in the opposite direction, interrupt and wait for the previous thread to stop
     if crossfade_running and crossfade_direction != direction:
         print(f"Interrupting crossfade to switch direction to {direction}")
         crossfade_interrupt = True
@@ -106,19 +112,19 @@ def on_press(key):
 
         if ctrl_pressed:
             if key == keyboard.Key.right:
-                print("Ctrl + Arrow Right detected: Increase duration")
+                print("[Keyboard] Ctrl + Arrow Right pressed: Increase duration")
                 adjust_duration(increase=True)
 
             elif key == keyboard.Key.left:
-                print("Ctrl + Arrow Left detected: Decrease duration")
+                print("[Keyboard] Ctrl + Arrow Left pressed: Decrease duration")
                 adjust_duration(increase=False)
 
             elif key.char == '<':
-                print("Ctrl + < detected: Crossfade down")
+                print("[Keyboard] Ctrl + < pressed: Crossfade down")
                 start_crossfade('down')
 
             elif key.char == 'z':
-                print("Ctrl + Z detected: Crossfade up")
+                print("[Keyboard] Ctrl + Z pressed: Crossfade up")
                 start_crossfade('up')
 
     except AttributeError:
@@ -143,10 +149,10 @@ def midi_listener():
     if USB_XSESSION_PORT:
         for msg in USB_XSESSION_PORT:
             if msg.type == 'control_change' and msg.control == MIDICONTROLLER_LEFT_CC_NUMBER:
-                print("Button on USB X-Session pressed: Starting crossfade Left")
+                print("[USB Controller] ⏴ pressed: Crossfade down")
                 start_crossfade('down')
             if msg.type == 'control_change' and msg.control == MIDICONTROLLER_RIGHT_CC_NUMBER:
-                print("Button on USB X-Session pressed: Starting crossfade Right")
+                print("[USB Controller] ⏵ pressed: Crossfade up")
                 start_crossfade('up')
 
 # Start the MIDI listener thread
