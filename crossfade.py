@@ -16,7 +16,7 @@ crossfade_interrupt = False
 
 # Durations for total crossfade time (from 0 to 127)
 DURATIONS = [1, 2, 10, 30, 60, 300, 600]  # In seconds: 1sec, 2sec, 10sec, 30sec, 1min, 5min, 10min
-duration_index = 3  # Start with the 3sec duration by default
+duration_index = 2  # Start with the 10sec duration by default
 
 # Open MIDI output once
 OUTPUT_PORT = mido.open_output('IAC-Treiber Bus 1')
