@@ -8,6 +8,7 @@ MIDI_CC_NUMBER = 60                 # CC number for Composition Crossfader Phase
 MIDI_CHANNEL = 1                    # MIDI channel (1-based)
 MIDICONTROLLER_LEFT_CC_NUMBER = 87  # CC number for the "Fade to Left"-button on USB X-Session Anschluss 1
 MIDICONTROLLER_RIGHT_CC_NUMBER = 15 # CC number for the "Fade to Right"-button on USB X-Session Anschluss 1
+MIDICONTROLLER_CFADE_CC_NUMBER = 10 # CC number for the Master Crossfader on USB X-Session Anschluss 1
 
 # DEFAULT VALUES
 midi_current_value = 64 # Current value (0-127), where 64 is the middle
@@ -146,6 +147,7 @@ def on_release(key):
 
 # Function to listen for MIDI messages on USB X-Session
 def midi_listener():
+    global midi_current_value
     if USB_XSESSION_PORT:
         for msg in USB_XSESSION_PORT:
             if msg.type == 'control_change' and msg.control == MIDICONTROLLER_LEFT_CC_NUMBER:
@@ -154,6 +156,10 @@ def midi_listener():
             if msg.type == 'control_change' and msg.control == MIDICONTROLLER_RIGHT_CC_NUMBER:
                 print("[USB Controller] ⏵ pressed: Crossfade right")
                 start_crossfade('right')
+            if msg.type == 'control_change' and msg.control == MIDICONTROLLER_CFADE_CC_NUMBER:
+                print("[USB Controller] Crossfader moved: Stop automatic crossfade")
+                midi_current_value = msg.value
+                stop_crossfade()
 
 # Start the MIDI listener thread
 if USB_XSESSION_PORT:
