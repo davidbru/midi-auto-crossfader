@@ -29,7 +29,7 @@ USB_XSESSION_PORT = None
 try:
     USB_XSESSION_PORT = mido.open_input('USB X-Session Anschluss 1')
 except IOError:
-    print("'USB X-Session Anschluss 1' not available")
+    print("[USB Controller] 'USB X-Session Anschluss 1'-port not available")
 
 # Function to send MIDI Control Change message
 def send_midi_cc(value, direction):
@@ -163,10 +163,8 @@ def midi_listener():
 
 # Start the MIDI listener thread
 if USB_XSESSION_PORT:
-    print("USB_XSESSION_PORT available")
+    print("[USB Controller] 'USB X-Session Anschluss 1'-port available")
     threading.Thread(target=midi_listener, daemon=True).start()
-else:
-    print("USB_XSESSION_PORT NOT available")
 
 # Start the keyboard listener
 with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
