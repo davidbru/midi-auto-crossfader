@@ -1,11 +1,13 @@
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use midir::MidiOutputConnection;
+use crate::config::{DEFAULT_DURATION_INDEX, DURATIONS};
+use crate::osc::OscOutput;
 
-use crate::config::{DEFAULT_DURATION_INDEX, DURATIONS, MIDI_CC_NUMBER, MIDI_CHANNEL};
+const TICK: Duration = Duration::from_millis(20); // 50Hz - smooth for visuals, light on the network
+const LOG_EVERY_N_TICKS: u32 = 10; // ~5Hz progress logging, independent of the 50Hz send rate
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
@@ -17,27 +19,27 @@ pub struct CrossfadeState {
     running: AtomicBool,
     interrupt: AtomicBool,
     direction: Mutex<Option<Direction>>,
-    value: AtomicU8, // current crossfade value, 0-127 (64 = middle)
+    value: Mutex<f32>, // current crossfade value, 0.0-1.0 (0.5 = middle)
     duration_index: AtomicUsize,
     thread: Mutex<Option<JoinHandle<()>>>,
-    output: Mutex<MidiOutputConnection>,
+    osc: OscOutput,
 }
 
 impl CrossfadeState {
-    pub fn new(output: MidiOutputConnection) -> Self {
+    pub fn new(osc: OscOutput) -> Self {
         Self {
             running: AtomicBool::new(false),
             interrupt: AtomicBool::new(false),
             direction: Mutex::new(None),
-            value: AtomicU8::new(64),
+            value: Mutex::new(0.5),
             duration_index: AtomicUsize::new(DEFAULT_DURATION_INDEX),
             thread: Mutex::new(None),
-            output: Mutex::new(output),
+            osc,
         }
     }
 
-    pub fn set_value(&self, value: u8) {
-        self.value.store(value, Ordering::SeqCst);
+    pub fn set_value(&self, value: f32) {
+        *self.value.lock().unwrap() = value.clamp(0.0, 1.0);
     }
 
     pub fn adjust_duration(&self, increase: bool) {
@@ -88,8 +90,9 @@ impl CrossfadeState {
     }
 
     fn run_loop(&self) {
-        let total_duration = DURATIONS[self.duration_index.load(Ordering::SeqCst)];
-        let delay = Duration::from_secs_f64(total_duration as f64 / 127.0);
+        let total_duration = DURATIONS[self.duration_index.load(Ordering::SeqCst)] as f32;
+        let step = TICK.as_secs_f32() / total_duration;
+        let mut tick_count: u32 = 0;
 
         loop {
             if self.interrupt.load(Ordering::SeqCst) {
@@ -98,34 +101,27 @@ impl CrossfadeState {
             }
 
             let direction = *self.direction.lock().unwrap();
-            let current = self.value.load(Ordering::SeqCst);
+            let mut value = self.value.lock().unwrap();
 
             let next = match direction {
-                Some(Direction::Left) if current > 0 => current - 1,
-                Some(Direction::Right) if current < 127 => current + 1,
+                Some(Direction::Left) if *value > 0.0 => (*value - step).max(0.0),
+                Some(Direction::Right) if *value < 1.0 => (*value + step).min(1.0),
                 _ => {
                     self.running.store(false, Ordering::SeqCst);
                     return;
                 }
             };
 
-            self.value.store(next, Ordering::SeqCst);
-            self.send(next, direction.unwrap());
+            *value = next;
+            drop(value);
+            self.osc.send(next);
 
-            thread::sleep(delay);
-        }
-    }
+            if tick_count % LOG_EVERY_N_TICKS == 0 {
+                println!("Fading {:?}: {next:.3}", direction.unwrap());
+            }
+            tick_count = tick_count.wrapping_add(1);
 
-    fn send(&self, value: u8, direction: Direction) {
-        let status = 0xB0 | (MIDI_CHANNEL - 1);
-        let result = self
-            .output
-            .lock()
-            .unwrap()
-            .send(&[status, MIDI_CC_NUMBER, value]);
-        match result {
-            Ok(()) => println!("Sending MIDI CC {value}, direction: {direction:?}"),
-            Err(e) => eprintln!("[MIDI Output] failed to send CC: {e}"),
+            thread::sleep(TICK);
         }
     }
 }

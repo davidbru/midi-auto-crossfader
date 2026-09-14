@@ -8,49 +8,48 @@ $ cargo build --release
 
 # Configuration
 
-Unlike the Python version, MIDI port names are **not hardcoded** — they differ between macOS
-and Windows (and even between machines), so they're read from environment variables with a
-substring match (e.g. `MIDI_INPUT_PORT=X-Session` matches any port name containing that text).
+Output goes over **OSC** (not MIDI) — this avoids the whole virtual-MIDI-port dependency
+(loopMIDI / Windows MIDI Services) on the output side entirely, and gives smooth float
+resolution instead of MIDI's 128-step CC values. It's just a UDP packet to whatever OSC-listening
+visuals software you're using (e.g. Resolume Arena/Avenue).
 
-- `MIDI_OUTPUT_PORT` — the virtual MIDI port your visuals/DJ software listens on.
-  - macOS default: `IAC-Treiber Bus 1` (the built-in IAC Driver bus).
-  - Windows: no built-in virtual MIDI bus exists by default, but Windows 11 now ships
-    **Windows MIDI Services**, which can create one natively — no third-party tool needed:
-    1. Install the SDK/tools: `winget install --id Microsoft.MIDI.SDK`
-    2. Open `MIDI Settings` (Start menu, or
-       `C:\Program Files\Windows MIDI Services\Tools\Settings\MidiSettings.exe`) and create a
-       **permanent loopback endpoint pair** (e.g. named `Crossfader A` / `Crossfader B`). Under
-       the hood these are MIDI 2.0 endpoints, but they automatically bridge down to two MIDI
-       1.0 in/out port pairs, which `mido`/`midir` (and old-API apps generally) see fine.
-    3. Set `MIDI_OUTPUT_PORT` to one half of the pair (e.g. `Crossfader A`), and point your
-       visuals/DJ software's MIDI input at the *other* half (`Crossfader B`).
+- `OSC_HOST` — destination host. Default: `127.0.0.1` (same machine).
+- `OSC_PORT` — destination port. Default: `7000` (Resolume's default incoming OSC port).
+- `OSC_ADDRESS` — the OSC address to send the crossfade value (a float, `0.0`-`1.0`) to.
+  Default: `/composition/crossfader/phase` (confirmed against Resolume's own OSC input info
+  panel — click the Composition Crossfader control to see a parameter's exact address).
 
-    If you'd rather not use the (currently Release-Candidate/preview) native stack,
-    [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html) is the established
-    third-party alternative — just be aware it can conflict with Windows MIDI Services if both
-    are active at once.
-- `MIDI_INPUT_PORT` — the USB controller's input port name.
+In Resolume, enable OSC input (`Preferences` → `OSC`, port `7000` by default) and set up the
+Composition Crossfader (assign layers to its two groups). Resolume requires an explicit
+OSC-learn step before a parameter responds to incoming messages, the same as MIDI-learn:
+right-click the crossfader, enable OSC learn, and trigger a brief fade from this app so it can
+bind - just receiving/logging OSC traffic in the Preferences monitor isn't enough on its own.
+
+Input (the USB controller) is still MIDI, since it's real hardware:
+
+- `MIDI_INPUT_PORT` — the USB controller's input port name, matched by substring (e.g.
+  `MIDI_INPUT_PORT=X-Session` matches any port name containing that text).
   - macOS default: `USB X-Session Anschluss 1`.
   - Windows: the X-Session Pro is class-compliant — no driver install needed. It enumerates as
     `USB X-Session` (confirmed on Windows 11 24H2+/build 26200).
   - In general, if a name doesn't match, enumerate available ports by running the binary once
     with no env var set — it prints all available ports it couldn't match.
 
-If a port can't be found, the binary prints the list of available ports it did see, to make
-picking the right name easier.
-
 # Usage
 
 macOS:
 ```
-$ MIDI_OUTPUT_PORT="IAC-Treiber Bus 1" MIDI_INPUT_PORT="USB X-Session Anschluss 1" ./target/release/midi-auto-crossfader
+$ MIDI_INPUT_PORT="USB X-Session Anschluss 1" OSC_HOST=127.0.0.1 OSC_PORT=7000 ./target/release/midi-auto-crossfader
 ```
 
-Windows (with a Windows MIDI Services loopback pair named `Crossfader A` / `Crossfader B`, as
-set up above — verified working):
+Windows (verified working):
 ```
-> $env:MIDI_OUTPUT_PORT="Crossfader A"; $env:MIDI_INPUT_PORT="USB X-Session"; .\target\release\midi-auto-crossfader.exe
+> $env:MIDI_INPUT_PORT="USB X-Session"; $env:OSC_HOST="127.0.0.1"; $env:OSC_PORT="7000"; .\target\release\midi-auto-crossfader.exe
 ```
+
+Note: the `Crossfader A`/`Crossfader B` Windows MIDI Services loopback pair from earlier setup is
+no longer needed now that output is OSC — it was only required for MIDI output. The USB
+controller input side needs no virtual port at all, just its own class-compliant driver.
 
 - Default Duration: `10 seconds`
 - Fade to Left: `Ctrl` + `Left Arrow`, or the USB controller's `⏴` button (lower left)

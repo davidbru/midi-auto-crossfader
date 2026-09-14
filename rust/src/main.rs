@@ -1,33 +1,29 @@
 mod config;
 mod crossfade;
 mod midi;
+mod osc;
 
 use std::sync::Arc;
 
 use rdev::{listen, Event, EventType, Key};
 
 use crossfade::{CrossfadeState, Direction};
+use osc::OscOutput;
 
 fn main() {
-    let output_name = config::output_port_name();
-    if output_name.is_empty() {
-        eprintln!(
-            "No output MIDI port configured for this OS. Set the MIDI_OUTPUT_PORT \
-             environment variable (see rust/README.md)."
-        );
-        std::process::exit(1);
-    }
-
-    let output = match midi::open_output(&output_name) {
-        Ok(conn) => conn,
+    let osc_host = config::osc_host();
+    let osc_port = config::osc_port();
+    let osc_address = config::osc_address();
+    let osc_output = match OscOutput::new(&osc_host, osc_port, &osc_address) {
+        Ok(o) => o,
         Err(e) => {
-            eprintln!("[MIDI Output] {e}");
+            eprintln!("[OSC] failed to set up output socket: {e}");
             std::process::exit(1);
         }
     };
-    println!("[MIDI Output] connected (matched '{output_name}')");
+    println!("[OSC] sending '{osc_address}' to {osc_host}:{osc_port}");
 
-    let state = Arc::new(CrossfadeState::new(output));
+    let state = Arc::new(CrossfadeState::new(osc_output));
 
     let input_name = config::input_port_name();
     if input_name.is_empty() {
@@ -80,7 +76,7 @@ fn handle_midi_message(message: &[u8], state: &Arc<CrossfadeState>) {
         state.start(Direction::Right);
     } else if control == config::CROSSFADER_CC {
         println!("[USB Controller] crossfader moved manually: stopping automatic crossfade");
-        state.set_value(value);
+        state.set_value(value as f32 / 127.0);
         state.stop();
     }
 }
