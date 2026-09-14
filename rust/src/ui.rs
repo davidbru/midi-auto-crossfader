@@ -63,12 +63,17 @@ fn render_bar(value: f32, arrow: Option<char>) -> String {
     chars[pos] = '*';
 
     if let Some(arrow) = arrow {
-        let arrow_pos = if pos + 1 < BAR_WIDTH {
-            pos + 1
+        // The arrowhead sits on the side opposite its own travel direction, touching the
+        // star as if pushing it that way: '<' (moving left) goes to the right of '*' ("*<"),
+        // '>' (moving right) goes to the left of '*' (">*") - never trailing behind the move.
+        let preferred = if arrow == '<' { pos + 1 } else { pos.wrapping_sub(1) };
+        let fallback = if arrow == '<' { pos.wrapping_sub(1) } else { pos + 1 };
+        let arrow_pos = if preferred < BAR_WIDTH && preferred != pos {
+            preferred
         } else {
-            pos.saturating_sub(1)
+            fallback
         };
-        if arrow_pos != pos {
+        if arrow_pos < BAR_WIDTH && arrow_pos != pos {
             chars[arrow_pos] = arrow;
         }
     }
