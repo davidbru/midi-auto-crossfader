@@ -66,7 +66,7 @@ fn main() {
         }
     }
 
-    state.log("Ready - Ctrl+< fade left, Ctrl+Y fade right, Ctrl+A/S adjust duration, Esc quit.");
+    state.log("Ready - Ctrl+< fade left, Ctrl+Y fade right, Ctrl+Q/W adjust duration, Esc quit.");
 
     let mut ctrl_pressed = false;
     let mut ctrl_released_at: Option<Instant> = None;
@@ -154,13 +154,23 @@ fn handle_keyboard_event(
                     state.log("[Keyboard] Ctrl+Y pressed: crossfade right");
                     state.start(Direction::Right);
                 }
-                Key::KeyA => {
-                    state.log("[Keyboard] Ctrl+A pressed: decrease duration");
-                    state.adjust_duration(false);
+                // Not Ctrl+A/S: those are the classic terminal XON/XOFF flow-control
+                // characters (Ctrl+S pauses output, Ctrl+Q resumes it) that some terminal
+                // emulators (e.g. JediTerm, PhpStorm's integrated console) still honor,
+                // which looked like the app hanging until the next keypress "resumed" it.
+                Key::KeyQ => {
+                    let seconds = state.adjust_duration(false);
+                    state.log_with_duration(
+                        format!("[Keyboard] Ctrl+Q pressed: decrease duration to {seconds} seconds"),
+                        seconds,
+                    );
                 }
-                Key::KeyS => {
-                    state.log("[Keyboard] Ctrl+S pressed: increase duration");
-                    state.adjust_duration(true);
+                Key::KeyW => {
+                    let seconds = state.adjust_duration(true);
+                    state.log_with_duration(
+                        format!("[Keyboard] Ctrl+W pressed: increase duration to {seconds} seconds"),
+                        seconds,
+                    );
                 }
                 other => {
                     state.log(format!(

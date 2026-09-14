@@ -59,6 +59,11 @@ impl CrossfadeState {
         self.ui.log(msg);
     }
 
+    /// Same as `log`, but also updates the pinned duration line, as one atomic redraw.
+    pub fn log_with_duration(&self, msg: impl AsRef<str>, seconds: u64) {
+        self.ui.log_with_duration(msg, seconds);
+    }
+
     pub fn finish_ui(&self) {
         self.ui.finish();
     }
@@ -69,7 +74,8 @@ impl CrossfadeState {
         self.ui.set_position(value, None);
     }
 
-    pub fn adjust_duration(&self, increase: bool) {
+    /// Returns the new duration in seconds, so callers can include it in their own log line.
+    pub fn adjust_duration(&self, increase: bool) -> u64 {
         let mut idx = self.duration_index.load(Ordering::SeqCst);
         if increase && idx < DURATIONS.len() - 1 {
             idx += 1;
@@ -77,7 +83,7 @@ impl CrossfadeState {
             idx -= 1;
         }
         self.duration_index.store(idx, Ordering::SeqCst);
-        self.ui.set_duration(DURATIONS[idx]);
+        DURATIONS[idx]
     }
 
     /// Starts crossfading in `direction`. If already running in the opposite

@@ -54,8 +54,8 @@ controller input side needs no virtual port at all, just its own class-compliant
 - Default Duration: `10 seconds`
 - Fade to Left: `Ctrl` + `<`, or the USB controller's `⏴` button (lower left)
 - Fade to Right: `Ctrl` + `Y`, or the USB controller's `⏵` button (lower left)
-- Decrease Duration: `Ctrl` + `A`
-- Increase Duration: `Ctrl` + `S`
+- Decrease Duration: `Ctrl` + `Q`
+- Increase Duration: `Ctrl` + `W`
 - Quit: `Esc`
 - Moving the USB controller's physical crossfader manually aborts any running auto-crossfade
   and adopts its current position as the new starting value.
@@ -67,5 +67,9 @@ user session as the target app (no elevation needed for normal use).
 Arrow keys are deliberately not used for shortcuts: `rdev`'s global hook only *observes*
 keystrokes, it doesn't consume them, so the terminal window still receives them too - and many
 terminals bind `Ctrl`+arrows to scrolling the buffer, which hides the app's pinned status lines.
-`Ctrl`+`<`/`Y`/`A`/`S` are matched on the physical key position (not the character produced),
-since holding `Ctrl` makes the OS report a control character instead of the plain letter.
+`Ctrl`+`A`/`S` are avoided too: they're the classic terminal XON/XOFF flow-control characters
+(`Ctrl`+`S` pauses output, `Ctrl`+`Q` resumes it), which some terminal emulators - notably
+JediTerm, PhpStorm's integrated console - still honor, making the app look hung until the next
+keypress "resumed" it. `Ctrl`+`<`/`Y`/`Q`/`W` are matched on the physical key position (not the
+character produced), since holding `Ctrl` makes the OS report a control character instead of
+the plain letter.
