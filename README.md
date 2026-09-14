@@ -1,23 +1,11 @@
-# Install
-```
-$ pip install mido python-rtmidi
-$ pip install pynput
-```
+# midi-auto-crossfader
 
+Listens for button presses on an M-Audio X-Session Pro USB MIDI controller (or a global
+keyboard shortcut) and automatically ramps a MIDI Control Change value from one extreme to the
+other over a configurable duration — used to crossfade between two video/visual sources driven
+by MIDI CC.
 
-# Usage
-```
-$ python /Users/david/Workspaces/visuals/midi-auto-crossfader/crossfade.py
-```
-- Default Duration
-  - `10 Seconds`
-- Fade to Left
-  - MacBook `"CTRL" + "<"`
-  - USB Midicontroller `⏴` in the lower left
-- Fade to Right
-  - MacBook `"CTRL" + "y"`
-  - USB Midicontroller `⏵` in the lower left
-- Decrease Duration
-  - MacBook `"CTRL" + "Arrow Left"`
-- Increase Duration
-  - MacBook `"CTRL" + "Arrow Right"`
+Two implementations live here:
+
+- [`rust/`](rust/) — the current, cross-platform (macOS + Windows) version. Start here.
+- [`python/`](python/) — the original macOS-only implementation, kept for reference.
