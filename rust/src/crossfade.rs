@@ -90,8 +90,6 @@ impl CrossfadeState {
     }
 
     fn run_loop(&self) {
-        let total_duration = DURATIONS[self.duration_index.load(Ordering::SeqCst)] as f32;
-        let step = TICK.as_secs_f32() / total_duration;
         let mut tick_count: u32 = 0;
 
         loop {
@@ -99,6 +97,12 @@ impl CrossfadeState {
                 println!("Crossfade interrupted!");
                 return;
             }
+
+            // Re-read the duration every tick (rather than once at thread start) so that
+            // changing it mid-fade takes effect immediately: the remaining distance is
+            // covered at the new duration's rate, instead of finishing at the old rate.
+            let total_duration = DURATIONS[self.duration_index.load(Ordering::SeqCst)] as f32;
+            let step = TICK.as_secs_f32() / total_duration;
 
             let direction = *self.direction.lock().unwrap();
             let mut value = self.value.lock().unwrap();
