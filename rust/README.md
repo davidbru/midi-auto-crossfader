@@ -52,10 +52,10 @@ no longer needed now that output is OSC — it was only required for MIDI output
 controller input side needs no virtual port at all, just its own class-compliant driver.
 
 - Default Duration: `10 seconds`
-- Fade to Left: `Ctrl` + `Left Arrow`, or the USB controller's `⏴` button (lower left)
-- Fade to Right: `Ctrl` + `Right Arrow`, or the USB controller's `⏵` button (lower left)
-- Decrease Duration: `Ctrl` + `Down Arrow`
-- Increase Duration: `Ctrl` + `Up Arrow`
+- Fade to Left: `Ctrl` + `<`, or the USB controller's `⏴` button (lower left)
+- Fade to Right: `Ctrl` + `Y`, or the USB controller's `⏵` button (lower left)
+- Decrease Duration: `Ctrl` + `A`
+- Increase Duration: `Ctrl` + `S`
 - Quit: `Esc`
 - Moving the USB controller's physical crossfader manually aborts any running auto-crossfade
   and adopts its current position as the new starting value.
@@ -63,3 +63,9 @@ controller input side needs no virtual port at all, just its own class-compliant
 Keyboard shortcuts are global (work while any app is focused) — on macOS this requires granting
 Accessibility permissions to the terminal/binary; on Windows it may require running as the same
 user session as the target app (no elevation needed for normal use).
+
+Arrow keys are deliberately not used for shortcuts: `rdev`'s global hook only *observes*
+keystrokes, it doesn't consume them, so the terminal window still receives them too - and many
+terminals bind `Ctrl`+arrows to scrolling the buffer, which hides the app's pinned status lines.
+`Ctrl`+`<`/`Y`/`A`/`S` are matched on the physical key position (not the character produced),
+since holding `Ctrl` makes the OS report a control character instead of the plain letter.
